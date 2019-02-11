@@ -1,7 +1,8 @@
-﻿using System;
+﻿using NUnit.Framework;
+using System;
 using System.Collections.Generic;
-using Castle.DynamicProxy.Generators;
-using NUnit.Framework;
+using System.Linq;
+using TypeSharp.Tests.TestData.NamespaceClasses.FirstSpace;
 using TypeSharp.Tests.TestData.SimpleClasses;
 
 namespace TypeSharp.Tests
@@ -10,17 +11,22 @@ namespace TypeSharp.Tests
     public class UnitTest1
     {
         [Test]
-        public void TestMethod1()
+        public void TestSingleClassWithDefaultProperties()
         {
-            var generator = new Generator();
-            var contentGenerator = new ContentGenerator();
+            var tsType = new TsTypeGenerator().Generate(typeof(ClassWithAllSupportedTypes));
+            var module = new DefaultTsModuleGenerator().Generate(tsType);
+            var tsFileContent = new TsFileContentGenerator().Generate("TestRoot", module);
 
-            var m = generator.StructureModules(new List<Type>() {typeof(ClassWithAllSupportedTypes)});
-            var m2 = generator.Convert(m);
-            var result = contentGenerator.GenerateContent(m2[0]);
+            Assert.AreEqual(actual: tsFileContent.Content, expected: "export interface ClassWithAllSupportedTypes {\r\n\tAbool: boolean;\r\n\tAstring: string;\r\n\tADatetime: Date;\r\n\tADatetimeOffset: Date;\r\n\tAlong: number;\r\n\tAint: number;\r\n\tAdecimal: number;\r\n\tAdouble: number;\r\n}\r\n");
+        }
 
-
-            var expectedResult = "export interface ClassWithAllSupportedTypes {    Abool: boolean;    Astring: string;    ADateTime: Date;    ADateTimeOffset: Date;    Along: number;    Aint: number;    Adecimal: number;    Adouble: number;}";
+        [Test]
+        public void TestModuleReference()
+        {
+            var tsTypes = new TsTypeGenerator().Generate(new List<Type>() { typeof(ClassWithAllSupportedTypes), typeof(ClassWithPropertyReferenceToAnotherNamespace) });
+            var modules = new DefaultTsModuleGenerator().Generate(tsTypes);
+            var tsFileContentGenerator = new TsFileContentGenerator();
+            var result = modules.Select(x => tsFileContentGenerator.Generate("TestRoot", x)).ToList();
         }
     }
 }

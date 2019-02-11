@@ -57,6 +57,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="TestData\NamespaceClasses\FirstSpace\ClassWithPropertyReferenceToAnotherNamespace.cs" />
     <Compile Include="TestData\SimpleClasses\ClassWithAllSupportedTypes.cs" />
     <Compile Include="UnitTest1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
