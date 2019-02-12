@@ -11,50 +11,55 @@ namespace TypeSharp
         public TsFile Generate(string rootElement, TsModule module)
         {
             var builder = new StringBuilder();
-            foreach (var reference in module.References.Cast<TsModuleReferenceSpecific>().OrderBy(x => x.Module.GetModuleImport(rootElement))) // only supported ref so far.
+            foreach (var reference in module.References.OrderBy(x => x.Module.GetModuleImport(rootElement)))
             {
-                builder.Append(GenerateReference(rootElement, reference));
+                AddReferences(builder, rootElement, reference);
                 builder.AppendLine();
             }
-            foreach (var moduleType in module.Types)
+            foreach (var type in module.Types)
             {
-                builder.Append(GenerateContent(moduleType, string.Empty));
+                switch (type)
+                {
+                    case TsEnum tsEnum:
+                        AddContent(builder, string.Empty, tsEnum);
+                        break;
+                    case TsTypeWithPropertiesBase tsTypeWithPropertiesBase:
+                        AddContent(builder, string.Empty, tsTypeWithPropertiesBase);
+                        break;
+                    default:
+                        throw new ArgumentException($"Could not generate content for type ({type.Name})");
+                }
                 builder.AppendLine();
             }
             return new TsFile(builder.ToString(), module.ModuleName, module.ModulePath, module.GeneratesJavascript ? TsFileType.TypeScript : TsFileType.Definition);
         }
 
-        private static string GenerateReference(string rootElement, TsModuleReferenceSpecific reference)
+        private static void AddReferences(StringBuilder builder, string rootElement, TsModuleReference reference)
         {
-            var builder = new StringBuilder();
             builder.Append("import { ");
             builder.Append(string.Join(", ", reference.Types.Select(x => x.Name).OrderBy(x => x)));
             builder.Append(" } from \"");
             builder.Append(reference.Module.GetModuleImport(rootElement) + "\";");
-            return builder.ToString(); // todo fix builders?
         }
 
-        private string GenerateContent(TsType type, string indententionString)
+        private static void AddContent(StringBuilder builder, string indententionString, TsTypeWithPropertiesBase type)
         {
-            var builder = new StringBuilder();
             builder.Append(indententionString);
             if (type.IsExport)
             {
                 builder.Append("export ");
             }
 
-            if (type.IsInterface)
+            switch (type)
             {
-                builder.Append("interface ");
-            }
-            else if (type.IsEnum)
-            {
-                throw new NotImplementedException();
-                //builder.Append("enum "); // todo jl
-            }
-            else
-            {
-                throw new NotImplementedException();
+                case TsInterface _:
+                    builder.Append("interface ");
+                    break;
+                case TsClass _:
+                    builder.Append("class ");
+                    break;
+                default:
+                    throw new ArgumentException($"Can not generate content for type ({type.Name})");
             }
 
             builder.Append(type.Name + " {");
@@ -66,33 +71,51 @@ namespace TypeSharp
                 builder.AppendLine();
             }
             builder.Append(indententionString + "}");
-            return builder.ToString();
         }
 
-        private string GenerateContent(TsProperty property)
+        private static void AddContent(StringBuilder builder, string indententionString, TsEnum type)
+        {
+            builder.Append(indententionString);
+            if (type.IsExport)
+            {
+                builder.Append("export ");
+            }
+            builder.Append($"enum {type.Name} " + "{");
+            builder.AppendLine();
+            builder.Append(string.Join($",{Environment.NewLine}", type.Values.Select(x => $"{indententionString}\t{GenerateContent(x)}")));
+            builder.AppendLine();
+            builder.Append(indententionString + "}");
+        }
+
+        private static string GenerateContent(EnumValue enumValue)
+        {
+            return $"{enumValue.Name} = {enumValue.Value}";
+        }
+
+        private static string GenerateContent(TsProperty property)
         {
             if (property.PropertyType is TsDefaultType defaultType)
             {
-                return $"{property.Name}: {Convert(defaultType.DefaultType)};";
+                return $"{property.Name}: {Convert(defaultType)};";
             }
 
             return $"{property.Name}: {property.PropertyType.Name};";
         }
 
-        private string Convert(TsDefault tsDefault)
+        private static string Convert(TsDefaultType tsDefaultType)
         {
-            switch (tsDefault)
+            switch (tsDefaultType)
             {
-                case TsDefault.Number:
-                    return "number";
-                case TsDefault.Boolean:
-                    return "boolean";
-                case TsDefault.Date:
+                case TsBoolean tsBoolean:
+                    return tsBoolean.IsObject ? "Number" : "number";
+                case TsDate _:
                     return "Date";
-                case TsDefault.String:
-                    return "string";
+                case TsNumber tsNumber:
+                    return tsNumber.IsObject ? "Boolean" : "boolean";
+                case TsString tsString:
+                    return tsString.IsObject ? "String" : "string";
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(tsDefault), tsDefault, null);
+                    throw new ArgumentException("Could not create content for default type");
             }
         }   
     }

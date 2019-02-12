@@ -27,6 +27,17 @@ namespace TypeSharp.Tests
             var modules = new DefaultTsModuleGenerator().Generate(tsTypes);
             var tsFileContentGenerator = new TsFileContentGenerator();
             var result = modules.Select(x => tsFileContentGenerator.Generate("TestRoot", x)).ToList();
+            Assert.AreEqual(actual: result[1].Content, expected: "import { ClassWithAllSupportedTypes } from \"TestRoot/TypeSharp/Tests/TestData/SimpleClasses\";\r\nexport class ClassWithPropertyReferenceToAnotherNamespace {\r\n\tClassWithAllSupportedTypes: ClassWithAllSupportedTypes;\r\n}\r\n");
+        }
+
+        [Test]
+        public void TestEnum()
+        {
+            var tsType = new TsTypeGenerator().Generate(typeof(SimpleEnum));
+            var module = new DefaultTsModuleGenerator().Generate(tsType);
+            var tsFileContentGenerator = new TsFileContentGenerator();
+            var result = tsFileContentGenerator.Generate("TestRoot", module);
+            Assert.AreEqual(actual: result.Content, expected: "export enum SimpleEnum {\r\n\tOne = 3,\r\n\tTwo = 5\r\n}\r\n");
         }
     }
 }

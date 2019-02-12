@@ -7,16 +7,16 @@ namespace TypeSharp
 {
     public class TsTypeGenerator
     {
-        public TsType Generate(Type type)
+        public TsTypeBase Generate(Type type)
         {
             return Generate(new List<Type>() {type}).Single();
         }
 
-        public IList<TsType> Generate(ICollection<Type> types)
+        public IList<TsTypeBase> Generate(ICollection<Type> types)
         {
-            var typeDict = types.Select(x => new TsType(x, x.Name, true, true, x.IsEnum, new List<TsProperty>())).ToDictionary(x => x.CSharpType, x => x);
+            var typeDict = types.Select(CreateTsType).ToDictionary(x => x.CSharpType, x => x);
 
-            foreach (var tsType in typeDict.Values)
+            foreach (var tsType in typeDict.Values.OfType<TsTypeWithPropertiesBase>())
             {
                 PopulateProperties(tsType, typeDict);
             }
@@ -24,9 +24,37 @@ namespace TypeSharp
             return typeDict.Values.ToList();
         }
 
-        private void PopulateProperties(TsType type, IReadOnlyDictionary<Type, TsType> typeDict)
+        private static TsTypeBase CreateTsType(Type type)
+        {
+            if (type.IsInterface)
+            {
+                return new TsInterface(type, type.Name, true, new List<TsProperty>());
+            }
+            else if (type.IsEnum)
+            {
+                return new TsEnum(type, type.Name, true, GetEnumValues(type));
+            }
+            else if (type.IsClass)
+            {
+                return new TsClass(type, type.Name, true, new List<TsProperty>());
+            }
+            throw new ArgumentException($"Type ({type.Name}) is not a interface, enum or class");
+        }
+
+        private static IList<EnumValue> GetEnumValues(Type type)
+        {
+            var list = new List<int>();
+            foreach (var enumValue in type.GetEnumValues())
+            {
+                list.Add((int)enumValue);
+            }
+            return list.Zip(type.GetEnumNames(), (value, name) => new EnumValue(name, value)).ToList();
+        }
+
+        private static void PopulateProperties(TsTypeWithPropertiesBase type, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
         {
             var properties = type.CSharpType.GetProperties(BindingFlags.Instance | BindingFlags.Public); // todo improve
+            
             foreach (var propertyInfo in properties)
             {
                 if (IsDefaultType(propertyInfo.PropertyType))
@@ -34,10 +62,7 @@ namespace TypeSharp
                     type.Properties.Add(
                         new TsProperty(
                             name: propertyInfo.Name,
-                            propertyType: new TsDefaultType(
-                                propertyInfo.PropertyType,
-                                propertyInfo.PropertyType.Name,
-                                GetDefaultType(propertyInfo.PropertyType)),
+                            propertyType: GetDefaultType(propertyInfo.PropertyType),
                             accessModifier: TsAccessModifier.Public,
                             hasGetter: false,
                             hasSetter: false));
@@ -53,27 +78,27 @@ namespace TypeSharp
             }
         }
 
-        private TsDefault GetDefaultType(Type type)
+        private static TsDefaultType GetDefaultType(Type type)
         {
             if (type == typeof(bool))
             {
-                return TsDefault.Boolean;
+                return new TsBoolean(type, type.Name);
             }
             else if (type == typeof(DateTime) ||
                      type == typeof(DateTimeOffset))
             {
-                return TsDefault.Date;
+                return new TsDate(type, type.Name);
             }
             else if (type == typeof(string))
             {
-                return TsDefault.String;
+                return new TsString(type, type.Name);
             }
             else if (type == typeof(long) ||
                      type == typeof(int) ||
                      type == typeof(decimal) ||
                      type == typeof(double))
             {
-                return TsDefault.Number;
+                return new TsNumber(type, type.Name);
             }
             throw new ArgumentException("Type is not a default ts type");
         }
@@ -91,56 +116,144 @@ namespace TypeSharp
                 type == typeof(double);
         }
     }
-    public class TsType
+    public abstract class TsTypeBase
     {
-        public Type CSharpType { get; set; }
-        public string Name { get; set; }
-        public bool IsExport { get; set; }
-        public bool IsInterface { get; set; }
-        //public bool IsClass { get; set; }
-        //public bool IsAbstract { get; set; }
-        public bool IsEnum { get; set; }
-        //public bool IsPrimitive { get; set; }
-        public ICollection<TsProperty> Properties { get; set; }
+        public Type CSharpType { get; }
+        public string Name { get; }
 
-        public TsType(Type cSharpType, string name, bool isExport, bool isInterface, bool isEnum, ICollection<TsProperty> properties)
+        protected TsTypeBase(Type cSharpType, string name)
         {
             CSharpType = cSharpType;
             Name = name;
+        }
+    }
+
+    public abstract class TsTypeWithPropertiesBase : TsTypeBase
+    {
+        public bool IsExport { get; set; }
+        public ICollection<TsProperty> Properties { get; }
+
+        protected TsTypeWithPropertiesBase(Type cSharpType, string name, bool isExport, ICollection<TsProperty> properties) : base(cSharpType, name)
+        {
             IsExport = isExport;
-            IsInterface = isInterface;
-            IsEnum = isEnum;
             Properties = properties;
         }
     }
 
-    public enum TsDefault
+    public sealed class TsClass : TsTypeWithPropertiesBase
     {
-        Number,
-        Boolean,
-        Date,
-        String
+        
+        
+        public TsClass(Type cSharpType, string name, bool isExport, ICollection<TsProperty> properties) : base(cSharpType, name, isExport, properties)
+        {
+        }
     }
 
-    public class TsDefaultType : TsType
+    public sealed class TsInterface : TsTypeWithPropertiesBase
     {
-        public TsDefault DefaultType { get; }
-
-        public TsDefaultType(Type cSharpType, string name, TsDefault defaultType) : base(cSharpType, name, false, false, false, new List<TsProperty>())
+        public TsInterface(Type cSharpType, string name, bool isExport, ICollection<TsProperty> properties)
+            : base(cSharpType, name, isExport, properties)
         {
-            DefaultType = defaultType;
+        }
+    }
+
+    public sealed class TsEnum : TsTypeBase
+    {
+        public bool IsExport { get; set; }
+        public ICollection<EnumValue> Values { get; }
+
+        public TsEnum(Type cSharpType, string name, bool isExport, ICollection<EnumValue> values) : base(cSharpType, name)
+        {
+            IsExport = isExport;
+            Values = values;
+        }
+    }
+
+    public sealed class EnumValue
+    {
+        public string Name { get; }
+        public int Value { get; }
+
+        public EnumValue(string name, int value)
+        {
+            Name = name;
+            Value = value;
+        }
+    }
+
+    public abstract class TsDefaultType : TsTypeBase
+    {
+        public abstract bool IsObject { get; protected set; }
+
+        protected TsDefaultType(Type cSharpType, string name) : base(cSharpType, name)
+        {
+        }
+    }
+
+    public sealed class TsNumber : TsDefaultType
+    {
+        public override bool IsObject { get; protected set; }
+
+        public TsNumber(Type cSharpType, string name, bool isObject = false) : base(cSharpType, name)
+        {
+            IsObject = isObject;
+        }
+
+        public void SetIsObject(bool isObject)
+        {
+            IsObject = isObject;
+        }
+    }
+
+    public sealed class TsBoolean : TsDefaultType
+    {
+        public override bool IsObject { get; protected set; }
+
+        public TsBoolean(Type cSharpType, string name, bool isObject = false) : base(cSharpType, name)
+        {
+            IsObject = isObject;
+        }
+
+        public void SetIsObject(bool isObject)
+        {
+            IsObject = isObject;
+        }
+    }
+
+    public sealed class TsString : TsDefaultType
+    {
+        public override bool IsObject { get; protected set; }
+
+        public TsString(Type cSharpType, string name, bool isObject = false) : base(cSharpType, name)
+        {
+            IsObject = isObject;
+        }
+
+        public void SetIsObject(bool isObject)
+        {
+            IsObject = isObject;
+        }
+    }
+
+    public sealed class TsDate : TsDefaultType
+    {
+        public override bool IsObject { get; protected set; }
+
+        public TsDate(Type cSharpType, string name) : base(cSharpType, name)
+        {
+            IsObject = true;
         }
     }
 
     public class TsProperty
     {
         public string Name { get; set; }
-        public TsType PropertyType { get; set; }
+        public TsTypeBase PropertyType { get; set; }
         public TsAccessModifier AccessModifier { get; set; }
         public bool HasGetter { get; set; }
         public bool HasSetter { get; set; }
 
-        public TsProperty(string name, TsType propertyType, TsAccessModifier accessModifier, bool hasGetter, bool hasSetter)
+        public TsProperty(string name, TsTypeBase propertyType, TsAccessModifier accessModifier, bool hasGetter, bool hasSetter)
         {
             Name = name;
             PropertyType = propertyType;

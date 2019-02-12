@@ -6,12 +6,12 @@ namespace TypeSharp
 {
     public class DefaultTsModuleGenerator
     {
-        public TsModule Generate(TsType type)
+        public TsModule Generate(TsTypeBase type)
         {
-            return Generate(new List<TsType>() { type }).Single();
+            return Generate(new List<TsTypeBase>() { type }).Single();
         }
 
-        public IList<TsModule> Generate(ICollection<TsType> types)
+        public IList<TsModule> Generate(ICollection<TsTypeBase> types)
         {
             var modulesForNamespace = new Dictionary<string, TsModule>();
             foreach (var type in types)
@@ -30,26 +30,22 @@ namespace TypeSharp
                     var namespaceArray = type.CSharpType.Namespace.Split('.');
                     var name = namespaceArray[namespaceArray.Length - 1];
                     var path = namespaceArray.Take(namespaceArray.Length - 1).ToList();
-                    modulesForNamespace[type.CSharpType.Namespace] = new TsModule(name, path, new List<TsModuleReferenceBase>(), new List<TsType>() { type });
+                    modulesForNamespace[type.CSharpType.Namespace] = new TsModule(name, path, new List<TsModuleReference>(), new List<TsTypeBase>() { type });
                 }
             }
 
             foreach (var tsModule in modulesForNamespace.Values)
             {
-                foreach (var type in tsModule.Types)
+                foreach (var type in tsModule.Types.OfType<TsTypeWithPropertiesBase>())
                 {
                     tsModule.References.AddRange(GetReferences(type, modulesForNamespace));
                 }
             }
             return modulesForNamespace.Select(x => x.Value).ToList();
         }
-        private static IList<TsModuleReferenceBase> GetReferences(TsType tsType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
+        private static IList<TsModuleReference> GetReferences(TsTypeWithPropertiesBase tsType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
         {
-            if (tsType is TsDefaultType)
-            {
-                return new List<TsModuleReferenceBase>();
-            }
-            var referenceDict = new Dictionary<TsModule, List<TsType>>();
+            var referenceDict = new Dictionary<TsModule, List<TsTypeBase>>();
             var ownModule = modulesForNamespace[tsType.CSharpType.Namespace];
 
             // todo look att base classes and generics
@@ -69,7 +65,7 @@ namespace TypeSharp
                     }
                     else
                     {
-                        referenceDict[module] = new List<TsType>() { propertyType };
+                        referenceDict[module] = new List<TsTypeBase> { propertyType };
                     }
                 }
                 else
@@ -77,49 +73,31 @@ namespace TypeSharp
                     throw new ArgumentException($"Property type ({propertyType.CSharpType.Name}) are not part of the type set");
                 }
             }
-            return referenceDict.Select(kvp => new TsModuleReferenceSpecific(kvp.Key, kvp.Value)).Cast<TsModuleReferenceBase>().ToList();
+            return referenceDict.Select(kvp => new TsModuleReference(kvp.Key, kvp.Value)).ToList();
         }
     }
 
-    public abstract class TsModuleReferenceBase
+    public sealed class TsModuleReference
     {
-        public TsModule Module { get; set; }
+        public TsModule Module { get; }
+        public IList<TsTypeBase> Types { get; }
 
-        protected TsModuleReferenceBase(TsModule module)
+        public TsModuleReference(TsModule module, IList<TsTypeBase> types)
         {
             Module = module;
-        }
-    }
-
-    public class TsModuleReferenceSpecific : TsModuleReferenceBase
-    {
-        public IList<TsType> Types { get; }
-
-        public TsModuleReferenceSpecific(TsModule module, IList<TsType> types) : base(module)
-        {
             Types = types;
         }
     }
 
-    //public class TsModuleReferenceAll : TsModuleReferenceBase
-    //{
-    //    public string AsVariable { get; }
-
-    //    public TsModuleReferenceAll(TsModule module, string asVariable) : base(module)
-    //    {
-    //        AsVariable = asVariable;
-    //    }
-    //}
-
-    public class TsModule
+    public sealed class TsModule
     {
         public readonly string ModuleName; // SimpleClasses
         public readonly IReadOnlyCollection<string> ModulePath; // { "TypeSharp","Tests", "TestData" }
-        public ICollection<TsModuleReferenceBase> References { get; set; }
-        public ICollection<TsType> Types { get; set; }
+        public ICollection<TsModuleReference> References { get; set; }
+        public ICollection<TsTypeBase> Types { get; set; }
 
 
-        public TsModule(string moduleName, IReadOnlyCollection<string> modulePath, ICollection<TsModuleReferenceBase> references, ICollection<TsType> types)
+        public TsModule(string moduleName, IReadOnlyCollection<string> modulePath, ICollection<TsModuleReference> references, ICollection<TsTypeBase> types)
         {
             ModuleName = moduleName;
             ModulePath = modulePath;
@@ -127,7 +105,7 @@ namespace TypeSharp
             Types = types;
         }
 
-        public bool GeneratesJavascript => Types.Any(x => !x.IsInterface);
+        public bool GeneratesJavascript => Types.Any(x => !(x is TsInterface));
 
         public string GetModuleImport(string rootElement) // todo naming?
         {
