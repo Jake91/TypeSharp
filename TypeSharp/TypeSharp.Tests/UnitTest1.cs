@@ -13,7 +13,7 @@ namespace TypeSharp.Tests
         [Test]
         public void TestSingleClassWithDefaultProperties()
         {
-            var tsType = new TsTypeGenerator().Generate(typeof(ClassWithAllSupportedTypes));
+            var tsType = new TsTypeGenerator().Generate(typeof(ClassWithAllSupportedTypes), generateInterfaceAsDefault: true);
             var module = new DefaultTsModuleGenerator().Generate(tsType);
             var tsFileContent = new TsFileContentGenerator().Generate("TestRoot", module);
 
@@ -23,17 +23,17 @@ namespace TypeSharp.Tests
         [Test]
         public void TestModuleReference()
         {
-            var tsTypes = new TsTypeGenerator().Generate(new List<Type>() { typeof(ClassWithAllSupportedTypes), typeof(ClassWithPropertyReferenceToAnotherNamespace) });
+            var tsTypes = new TsTypeGenerator().Generate(new List<Type>() { typeof(ClassWithAllSupportedTypes), typeof(ClassWithPropertyReferenceToAnotherNamespace) }, generateInterfaceAsDefault: true);
             var modules = new DefaultTsModuleGenerator().Generate(tsTypes);
             var tsFileContentGenerator = new TsFileContentGenerator();
             var result = modules.Select(x => tsFileContentGenerator.Generate("TestRoot", x)).ToList();
-            Assert.AreEqual(actual: result[1].Content, expected: "import { ClassWithAllSupportedTypes } from \"TestRoot/TypeSharp/Tests/TestData/SimpleClasses\";\r\nexport class ClassWithPropertyReferenceToAnotherNamespace {\r\n\tClassWithAllSupportedTypes: ClassWithAllSupportedTypes;\r\n}\r\n");
+            Assert.AreEqual(actual: result[1].Content, expected: "import { ClassWithAllSupportedTypes } from \"TestRoot/TypeSharp/Tests/TestData/SimpleClasses\";\r\nexport interface ClassWithPropertyReferenceToAnotherNamespace {\r\n\tClassWithAllSupportedTypes: ClassWithAllSupportedTypes;\r\n}\r\n"); // todo generate interface instead of class?
         }
 
         [Test]
         public void TestEnum()
         {
-            var tsType = new TsTypeGenerator().Generate(typeof(SimpleEnum));
+            var tsType = new TsTypeGenerator().Generate(typeof(SimpleEnum), generateInterfaceAsDefault: true);
             var module = new DefaultTsModuleGenerator().Generate(tsType);
             var tsFileContentGenerator = new TsFileContentGenerator();
             var result = tsFileContentGenerator.Generate("TestRoot", module);

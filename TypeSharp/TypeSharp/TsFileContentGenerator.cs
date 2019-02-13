@@ -107,11 +107,11 @@ namespace TypeSharp
             switch (tsDefaultType)
             {
                 case TsBoolean tsBoolean:
-                    return tsBoolean.IsObject ? "Number" : "number";
+                    return tsBoolean.IsObject ? "Boolean" : "boolean";
                 case TsDate _:
                     return "Date";
                 case TsNumber tsNumber:
-                    return tsNumber.IsObject ? "Boolean" : "boolean";
+                    return tsNumber.IsObject ? "Number" : "number";
                 case TsString tsString:
                     return tsString.IsObject ? "String" : "string";
                 default:

@@ -7,14 +7,14 @@ namespace TypeSharp
 {
     public class TsTypeGenerator
     {
-        public TsTypeBase Generate(Type type)
+        public TsTypeBase Generate(Type type, bool generateInterfaceAsDefault = true)
         {
             return Generate(new List<Type>() {type}).Single();
         }
 
-        public IList<TsTypeBase> Generate(ICollection<Type> types)
+        public IList<TsTypeBase> Generate(ICollection<Type> types, bool generateInterfaceAsDefault = true)
         {
-            var typeDict = types.Select(CreateTsType).ToDictionary(x => x.CSharpType, x => x);
+            var typeDict = types.Select(x => CreateTsType(x, generateInterfaceAsDefault)).ToDictionary(x => x.CSharpType, x => x);
 
             foreach (var tsType in typeDict.Values.OfType<TsTypeWithPropertiesBase>())
             {
@@ -24,19 +24,19 @@ namespace TypeSharp
             return typeDict.Values.ToList();
         }
 
-        private static TsTypeBase CreateTsType(Type type)
+        private static TsTypeBase CreateTsType(Type type, bool generateInterfaceAsDefault)
         {
-            if (type.IsInterface)
-            {
-                return new TsInterface(type, type.Name, true, new List<TsProperty>());
-            }
-            else if (type.IsEnum)
+            if (type.IsEnum)
             {
                 return new TsEnum(type, type.Name, true, GetEnumValues(type));
             }
-            else if (type.IsClass)
+            else if (type.IsClass && !generateInterfaceAsDefault)
             {
                 return new TsClass(type, type.Name, true, new List<TsProperty>());
+            }
+            else if (type.IsInterface || (type.IsClass && generateInterfaceAsDefault))
+            {
+                return new TsInterface(type, type.Name, true, new List<TsProperty>());
             }
             throw new ArgumentException($"Type ({type.Name}) is not a interface, enum or class");
         }
@@ -142,8 +142,6 @@ namespace TypeSharp
 
     public sealed class TsClass : TsTypeWithPropertiesBase
     {
-        
-        
         public TsClass(Type cSharpType, string name, bool isExport, ICollection<TsProperty> properties) : base(cSharpType, name, isExport, properties)
         {
         }
