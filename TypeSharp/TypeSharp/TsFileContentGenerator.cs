@@ -23,8 +23,11 @@ namespace TypeSharp
                     case TsEnum tsEnum:
                         AddContent(builder, string.Empty, tsEnum);
                         break;
-                    case TsTypeWithPropertiesBase tsTypeWithPropertiesBase:
-                        AddContent(builder, string.Empty, tsTypeWithPropertiesBase);
+                    case TsClass tsClass:
+                        AddContent(builder, string.Empty, tsClass);
+                        break;
+                    case TsInterface tsInterface:
+                        AddContent(builder, string.Empty, tsInterface);
                         break;
                     default:
                         throw new ArgumentException($"Could not generate content for type ({type.Name})");
@@ -42,27 +45,44 @@ namespace TypeSharp
             builder.Append(reference.Module.GetModuleImport(rootElement) + "\";");
         }
 
-        private static void AddContent(StringBuilder builder, string indententionString, TsTypeWithPropertiesBase type)
+        private static void AddContent(StringBuilder builder, string indententionString, TsClass type)
         {
             builder.Append(indententionString);
             if (type.IsExport)
             {
                 builder.Append("export ");
             }
-
-            switch (type)
+            builder.Append("class ");
+            builder.Append(type.Name);
+            if (type.BaseType != null)
             {
-                case TsInterface _:
-                    builder.Append("interface ");
-                    break;
-                case TsClass _:
-                    builder.Append("class ");
-                    break;
-                default:
-                    throw new ArgumentException($"Can not generate content for type ({type.Name})");
+                builder.Append($" extends {type.BaseType.Name}");
             }
+            builder.Append(" {");
+            builder.AppendLine();
+            foreach (var property in type.Properties)
+            {
+                builder.Append($"{indententionString}\t");
+                builder.Append(GenerateContent(property));
+                builder.AppendLine();
+            }
+            builder.Append(indententionString + "}");
+        }
 
-            builder.Append(type.Name + " {");
+        private static void AddContent(StringBuilder builder, string indententionString, TsInterface type)
+        {
+            builder.Append(indententionString);
+            if (type.IsExport)
+            {
+                builder.Append("export ");
+            }
+            builder.Append("interface ");
+            builder.Append(type.Name);
+            if (type.BaseType != null)
+            {
+                builder.Append($" extends {type.BaseType.Name}");
+            }
+            builder.Append(" {");
             builder.AppendLine();
             foreach (var property in type.Properties)
             {
@@ -92,14 +112,41 @@ namespace TypeSharp
             return $"{enumValue.Name} = {enumValue.Value}";
         }
 
-        private static string GenerateContent(TsProperty property)
+        private static string GenerateContent(TsInterfaceProperty interfaceProperty)
         {
-            if (property.PropertyType is TsDefaultType defaultType)
+            if (interfaceProperty.PropertyType is TsDefaultType defaultType)
             {
-                return $"{property.Name}: {Convert(defaultType)};";
+                return $"{interfaceProperty.Name}: {Convert(defaultType)};";
             }
 
-            return $"{property.Name}: {property.PropertyType.Name};";
+            return $"{interfaceProperty.Name}: {interfaceProperty.PropertyType.Name};";
+        }
+
+        private static string GenerateContent(TsClassProperty classProperty)
+        {
+            if (classProperty.PropertyType is TsDefaultType defaultType)
+            {
+                return $"{Convert(classProperty.AccessModifier)}{classProperty.Name}: {Convert(defaultType)};";
+            }
+
+            return $"{Convert(classProperty.AccessModifier)}{classProperty.Name}: {classProperty.PropertyType.Name};";
+        }
+
+        private static string Convert(TsAccessModifier accessModifier)
+        {
+            switch (accessModifier)
+            {
+                case TsAccessModifier.None:
+                    return string.Empty;
+                case TsAccessModifier.Private:
+                    return "private ";
+                case TsAccessModifier.Protected:
+                    return "protected ";
+                case TsAccessModifier.Public:
+                    return "public ";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(accessModifier), accessModifier, null);
+            }
         }
 
         private static string Convert(TsDefaultType tsDefaultType)

@@ -36,20 +36,39 @@ namespace TypeSharp
 
             foreach (var tsModule in modulesForNamespace.Values)
             {
-                foreach (var type in tsModule.Types.OfType<TsTypeWithPropertiesBase>())
+                foreach (var type in tsModule.Types.OfType<TsInterface>())
+                {
+                    tsModule.References.AddRange(GetReferences(type, modulesForNamespace));
+                }
+                foreach (var type in tsModule.Types.OfType<TsClass>())
                 {
                     tsModule.References.AddRange(GetReferences(type, modulesForNamespace));
                 }
             }
             return modulesForNamespace.Select(x => x.Value).ToList();
         }
-        private static IList<TsModuleReference> GetReferences(TsTypeWithPropertiesBase tsType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
+
+        private static IList<TsModuleReference> GetReferences(TsInterface tsType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
+        {
+            return GetReferences(tsType.CSharpType.Namespace, tsType.Properties.Select(x => x.PropertyType), tsType.BaseType, modulesForNamespace);
+        }
+
+        private static IList<TsModuleReference> GetReferences(TsClass tsType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
+        {
+            return GetReferences(tsType.CSharpType.Namespace, tsType.Properties.Select(x => x.PropertyType), tsType.BaseType, modulesForNamespace);
+        }
+
+        private static IList<TsModuleReference> GetReferences(string @namespace, IEnumerable<TsTypeBase> propertyTypes, TsTypeBase baseType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
         {
             var referenceDict = new Dictionary<TsModule, List<TsTypeBase>>();
-            var ownModule = modulesForNamespace[tsType.CSharpType.Namespace];
+            var ownModule = modulesForNamespace[@namespace];
 
-            // todo look att base classes and generics
-            var nonDefaultPropertyTypes = tsType.Properties.Select(x => x.PropertyType).Where(x => !(x is TsDefaultType)).ToList();
+            // todo look at generics
+            var nonDefaultPropertyTypes = propertyTypes.Where(x => !(x is TsDefaultType)).ToList();
+            if (baseType != null)
+            {
+                nonDefaultPropertyTypes.Add(baseType);
+            }
             foreach (var propertyType in nonDefaultPropertyTypes)
             {
                 // ReSharper disable once AssignNullToNotNullAttribute Already check that namespace is correct when creating TsModule

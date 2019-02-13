@@ -13,7 +13,7 @@ namespace TypeSharp.Tests
         [Test]
         public void TestSingleClassWithDefaultProperties()
         {
-            var tsType = new TsTypeGenerator().Generate(typeof(ClassWithAllSupportedTypes), generateInterfaceAsDefault: true);
+            var tsType = new TsTypeGenerator().Generate(typeof(ClassWithAllSupportedTypes), generateInterfaceAsDefault: true).Single();
             var module = new DefaultTsModuleGenerator().Generate(tsType);
             var tsFileContent = new TsFileContentGenerator().Generate("TestRoot", module);
 
@@ -33,11 +33,20 @@ namespace TypeSharp.Tests
         [Test]
         public void TestEnum()
         {
-            var tsType = new TsTypeGenerator().Generate(typeof(SimpleEnum), generateInterfaceAsDefault: true);
+            var tsType = new TsTypeGenerator().Generate(typeof(SimpleEnum), generateInterfaceAsDefault: true).Single();
             var module = new DefaultTsModuleGenerator().Generate(tsType);
             var tsFileContentGenerator = new TsFileContentGenerator();
             var result = tsFileContentGenerator.Generate("TestRoot", module);
             Assert.AreEqual(actual: result.Content, expected: "export enum SimpleEnum {\r\n\tOne = 3,\r\n\tTwo = 5\r\n}\r\n");
+        }
+
+        [Test]
+        public void TestBaseClass()
+        {
+            var tsTypes = new TsTypeGenerator().Generate(typeof(TestClassChild), generateInterfaceAsDefault: true);
+            var modules = new DefaultTsModuleGenerator().Generate(tsTypes);
+            var tsFileContentGenerator = new TsFileContentGenerator();
+            var result = modules.Select(x => tsFileContentGenerator.Generate("TestRoot", x)).ToList();
         }
     }
 }

@@ -2,26 +2,73 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
+using Castle.Core.Internal;
 
 namespace TypeSharp
 {
     public class TsTypeGenerator
     {
-        public TsTypeBase Generate(Type type, bool generateInterfaceAsDefault = true)
+        public IList<TsTypeBase> Generate(Type type, bool generateInterfaceAsDefault = true)
         {
-            return Generate(new List<Type>() {type}).Single();
+            return Generate(new List<Type>() {type});
         }
 
         public IList<TsTypeBase> Generate(ICollection<Type> types, bool generateInterfaceAsDefault = true)
         {
-            var typeDict = types.Select(x => CreateTsType(x, generateInterfaceAsDefault)).ToDictionary(x => x.CSharpType, x => x);
+            var typeDict = types.Distinct()
+                .Concat(types.SelectMany(GetDependingTypes))
+                .Distinct()
+                .Select(x => CreateTsType(x, generateInterfaceAsDefault))
+                .ToDictionary(x => x.CSharpType, x => x);
 
-            foreach (var tsType in typeDict.Values.OfType<TsTypeWithPropertiesBase>())
+            foreach (var tsType in typeDict.Values.OfType<TsInterface>())
             {
+                PopulateBaseType(tsType, typeDict);
+                PopulateProperties(tsType, typeDict);
+            }
+            foreach (var tsType in typeDict.Values.OfType<TsClass>())
+            {
+                PopulateBaseType(tsType, typeDict);
                 PopulateProperties(tsType, typeDict);
             }
 
             return typeDict.Values.ToList();
+        }
+
+        private static IList<Type> GetDependingTypes(Type type)
+        {
+            var set = new HashSet<Type>();
+            var stack = new Stack<Type>();
+            AddBaseTypeIfItExist(stack, type);
+            AddPropertyTypesIfItExist(stack, type);
+            while (!stack.IsNullOrEmpty())
+            {
+                var current = stack.Pop();
+                AddBaseTypeIfItExist(stack, current);
+                AddPropertyTypesIfItExist(stack, current);
+                set.Add(current);
+            }
+            return set.ToList();
+        }
+
+        private static void AddBaseTypeIfItExist(Stack<Type> stack, Type type)
+        {
+            if (HasBaseType(type.BaseType))
+            {
+                stack.Push(type.BaseType);
+            }
+        }
+
+        private static void AddPropertyTypesIfItExist(Stack<Type> stack, Type type)
+        {
+            foreach (var property in GetProperties(type))
+            {
+                if (!IsDefaultType(property.PropertyType))
+                {
+                    stack.Push(property.PropertyType);
+                }
+            }
         }
 
         private static TsTypeBase CreateTsType(Type type, bool generateInterfaceAsDefault)
@@ -32,11 +79,11 @@ namespace TypeSharp
             }
             else if (type.IsClass && !generateInterfaceAsDefault)
             {
-                return new TsClass(type, type.Name, true, new List<TsProperty>());
+                return new TsClass(type, type.Name, true, new List<TsClassProperty>(), null);
             }
             else if (type.IsInterface || (type.IsClass && generateInterfaceAsDefault))
             {
-                return new TsInterface(type, type.Name, true, new List<TsProperty>());
+                return new TsInterface(type, type.Name, true, new List<TsInterfaceProperty>(), null);
             }
             throw new ArgumentException($"Type ({type.Name}) is not a interface, enum or class");
         }
@@ -51,25 +98,84 @@ namespace TypeSharp
             return list.Zip(type.GetEnumNames(), (value, name) => new EnumValue(name, value)).ToList();
         }
 
-        private static void PopulateProperties(TsTypeWithPropertiesBase type, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        private static PropertyInfo[] GetProperties(Type type)
         {
-            var properties = type.CSharpType.GetProperties(BindingFlags.Instance | BindingFlags.Public); // todo improve
+            return type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly); // todo improve
+        }
+
+        private static void PopulateBaseType(TsInterface type, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        {
+            PopulateBaseType(type.CSharpType.BaseType, t => type.BaseType = t, typeDict);
+        }
+
+        private static void PopulateBaseType(TsClass type, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        {
+            PopulateBaseType(type.CSharpType.BaseType, t => type.BaseType = t, typeDict);
+        }
+
+        private static bool HasBaseType(Type baseType)
+        {
+            return baseType != null && baseType != typeof(object);
+        }
+
+        private static void PopulateBaseType(Type baseType, Action<TsTypeBase> setBaseTypeFn, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        {
+            if (HasBaseType(baseType))
+            {
+                if (typeDict.TryGetValue(baseType, out var tsType))
+                {
+                    setBaseTypeFn(tsType);
+                }
+                else
+                {
+                    throw new ArgumentException($"Could not populate basetype ({baseType.Name})");
+                }
+            }
+        }
+
+        private static void PopulateProperties(TsClass type, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        {
+            var properties = GetProperties(type.CSharpType);
+
+            foreach (var propertyInfo in properties)
+            {
+                if (IsDefaultType(propertyInfo.PropertyType))
+                {
+                    type.Properties.Add(
+                        new TsClassProperty(
+                            name: propertyInfo.Name,
+                            propertyType: GetDefaultType(propertyInfo.PropertyType),
+                            accessModifier: TsAccessModifier.Public, // todo fix these fields
+                            hasGetter: false,
+                            hasSetter: false));
+                }
+                else if (typeDict.TryGetValue(propertyInfo.PropertyType, out var tsType))
+                {
+                    type.Properties.Add(new TsClassProperty(propertyInfo.Name, tsType, TsAccessModifier.Public, false, false));
+                }
+                else
+                {
+                    throw new ArgumentException($"Type ({type.Name}) is not a default type, and it is not part of the types to generate");
+                }
+            }
+        }
+
+        private static void PopulateProperties(TsInterface type, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        {
+            var properties = GetProperties(type.CSharpType);
             
             foreach (var propertyInfo in properties)
             {
                 if (IsDefaultType(propertyInfo.PropertyType))
                 {
                     type.Properties.Add(
-                        new TsProperty(
-                            name: propertyInfo.Name,
-                            propertyType: GetDefaultType(propertyInfo.PropertyType),
-                            accessModifier: TsAccessModifier.Public,
-                            hasGetter: false,
-                            hasSetter: false));
+                        new TsInterfaceProperty(
+                            propertyInfo.Name,
+                            GetDefaultType(propertyInfo.PropertyType)));
                 }
                 else if (typeDict.TryGetValue(propertyInfo.PropertyType, out var tsType))
                 {
-                    type.Properties.Add(new TsProperty(propertyInfo.Name, tsType, TsAccessModifier.Public, false, false));
+                    type.Properties.Add(new TsInterfaceProperty(propertyInfo.Name, tsType));
                 }
                 else
                 {
@@ -116,6 +222,7 @@ namespace TypeSharp
                 type == typeof(double);
         }
     }
+
     public abstract class TsTypeBase
     {
         public Type CSharpType { get; }
@@ -128,30 +235,36 @@ namespace TypeSharp
         }
     }
 
-    public abstract class TsTypeWithPropertiesBase : TsTypeBase
+    public sealed class TsClass : TsTypeBase
     {
-        public bool IsExport { get; set; }
-        public ICollection<TsProperty> Properties { get; }
+        public TsTypeBase BaseType { get; internal set; }
 
-        protected TsTypeWithPropertiesBase(Type cSharpType, string name, bool isExport, ICollection<TsProperty> properties) : base(cSharpType, name)
+        public bool IsExport { get; set; }
+
+        public ICollection<TsClassProperty> Properties { get; }
+
+        public TsClass(Type cSharpType, string name, bool isExport, ICollection<TsClassProperty> properties, TsTypeBase baseType) : base(cSharpType, name)
         {
             IsExport = isExport;
             Properties = properties;
+            BaseType = baseType;
         }
     }
 
-    public sealed class TsClass : TsTypeWithPropertiesBase
+    public sealed class TsInterface : TsTypeBase
     {
-        public TsClass(Type cSharpType, string name, bool isExport, ICollection<TsProperty> properties) : base(cSharpType, name, isExport, properties)
-        {
-        }
-    }
+        public bool IsExport { get; }
 
-    public sealed class TsInterface : TsTypeWithPropertiesBase
-    {
-        public TsInterface(Type cSharpType, string name, bool isExport, ICollection<TsProperty> properties)
-            : base(cSharpType, name, isExport, properties)
+        public ICollection<TsInterfaceProperty> Properties { get; }
+
+        public TsTypeBase BaseType { get; internal set; }
+
+        public TsInterface(Type cSharpType, string name, bool isExport, ICollection<TsInterfaceProperty> properties, TsTypeBase baseType)
+            : base(cSharpType, name)
         {
+            IsExport = isExport;
+            Properties = properties;
+            BaseType = baseType;
         }
     }
 
@@ -243,15 +356,15 @@ namespace TypeSharp
         }
     }
 
-    public class TsProperty
+    public class TsClassProperty
     {
         public string Name { get; set; }
-        public TsTypeBase PropertyType { get; set; }
+        public TsTypeBase PropertyType { get; }
         public TsAccessModifier AccessModifier { get; set; }
         public bool HasGetter { get; set; }
         public bool HasSetter { get; set; }
 
-        public TsProperty(string name, TsTypeBase propertyType, TsAccessModifier accessModifier, bool hasGetter, bool hasSetter)
+        public TsClassProperty(string name, TsTypeBase propertyType, TsAccessModifier accessModifier, bool hasGetter, bool hasSetter)
         {
             Name = name;
             PropertyType = propertyType;
@@ -261,8 +374,21 @@ namespace TypeSharp
         }
     }
 
+    public class TsInterfaceProperty
+    {
+        public string Name { get; }
+        public TsTypeBase PropertyType { get; }
+
+        public TsInterfaceProperty(string name, TsTypeBase propertyType)
+        {
+            Name = name;
+            PropertyType = propertyType;
+        }
+    }
+
     public enum TsAccessModifier
     {
+        None = 0,
         Private = 1,
         Protected = 2,
         Public = 3
