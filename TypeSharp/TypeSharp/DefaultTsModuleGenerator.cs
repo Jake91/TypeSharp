@@ -58,18 +58,18 @@ namespace TypeSharp
             return GetReferences(tsType.CSharpType.Namespace, tsType.Properties.Select(x => x.PropertyType), tsType.BaseType, modulesForNamespace);
         }
 
-        private static IList<TsModuleReference> GetReferences(string @namespace, IEnumerable<TsTypeBase> propertyTypes, TsTypeBase baseType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
+        private static IList<TsModuleReference> GetReferences(string @namespace, IEnumerable<TsReferenceBase> propertyTypes,
+            TsTypeReferenceBase baseType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
         {
             var referenceDict = new Dictionary<TsModule, List<TsTypeBase>>();
             var ownModule = modulesForNamespace[@namespace];
 
-            // todo look at generics
-            var nonDefaultPropertyTypes = propertyTypes.Where(x => !(x is TsDefaultType)).ToList();
+            var references = propertyTypes.SelectMany(GetTsTypes).Where(x => !(x is TsDefaultType)).ToList();
             if (baseType != null)
             {
-                nonDefaultPropertyTypes.Add(baseType);
+                references.AddRange(GetTsTypes(baseType).Where(x => !(x is TsDefaultType)));
             }
-            foreach (var propertyType in nonDefaultPropertyTypes)
+            foreach (var propertyType in references)
             {
                 // ReSharper disable once AssignNullToNotNullAttribute Already check that namespace is correct when creating TsModule
                 if (modulesForNamespace.TryGetValue(propertyType.CSharpType.Namespace, out var module))
@@ -93,6 +93,21 @@ namespace TypeSharp
                 }
             }
             return referenceDict.Select(kvp => new TsModuleReference(kvp.Key, kvp.Value)).ToList();
+        }
+
+        private static IList<TsTypeBase> GetTsTypes(TsReferenceBase referenceBase)
+        {
+            switch (referenceBase)
+            {
+                case TsGenericTypeReferenceArgument _:
+                    return new List<TsTypeBase>();
+                case TsGenericTypeReference tsGenericTypeReference:
+                    return tsGenericTypeReference.GenericArguments.SelectMany(GetTsTypes).ToList();
+                case TsTypeReference tsTypeReference:
+                    return new List<TsTypeBase> { tsTypeReference.Type };
+                default:
+                    throw new ArgumentException("Not a valid type");
+            }
         }
     }
 

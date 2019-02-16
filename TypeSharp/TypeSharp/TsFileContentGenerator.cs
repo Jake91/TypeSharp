@@ -54,9 +54,15 @@ namespace TypeSharp
             }
             builder.Append("class ");
             builder.Append(type.Name);
+
+            if (type.IsGeneric)
+            {
+                builder.Append("<" + string.Join(", ", type.GenericArguments.Select(x => x.Name) + ">"));
+            }
+
             if (type.BaseType != null)
             {
-                builder.Append($" extends {type.BaseType.Name}");
+                builder.Append($" extends {GetContent(type.BaseType)}"); // todo
             }
             builder.Append(" {");
             builder.AppendLine();
@@ -69,6 +75,22 @@ namespace TypeSharp
             builder.Append(indententionString + "}");
         }
 
+        private static string GetContent(TsReferenceBase reference)
+        {
+            switch (reference)
+            {
+                case TsGenericTypeReferenceArgument tsGenericTypeReferenceArgument:// TResult
+                    return tsGenericTypeReferenceArgument.Name; 
+                case TsGenericTypeReference tsGenericTypeReference: // ClassX<int, ClassY<string>>
+                    return tsGenericTypeReference.Type.Name + "<" + string.Join(", ",
+                               tsGenericTypeReference.GenericArguments.Select(GetContent)) + ">"; 
+                case TsTypeReference tsTypeReference:
+                    return tsTypeReference.Type.Name;
+                default:
+                    throw new ArgumentException("Not okay");
+            }
+        }
+
         private static void AddContent(StringBuilder builder, string indententionString, TsInterface type)
         {
             builder.Append(indententionString);
@@ -78,9 +100,15 @@ namespace TypeSharp
             }
             builder.Append("interface ");
             builder.Append(type.Name);
+
+            if (type.IsGeneric)
+            {
+                builder.Append("<" + string.Join(", ", type.GenericArguments.Select(x => x.Name)) + ">");
+            }
+
             if (type.BaseType != null)
             {
-                builder.Append($" extends {type.BaseType.Name}");
+                builder.Append($" extends {GetContent(type.BaseType)}");
             }
             builder.Append(" {");
             builder.AppendLine();
@@ -114,22 +142,12 @@ namespace TypeSharp
 
         private static string GenerateContent(TsInterfaceProperty interfaceProperty)
         {
-            if (interfaceProperty.PropertyType is TsDefaultType defaultType)
-            {
-                return $"{interfaceProperty.Name}: {Convert(defaultType)};";
-            }
-
-            return $"{interfaceProperty.Name}: {interfaceProperty.PropertyType.Name};";
+            return $"{interfaceProperty.Name}: {GetContent(interfaceProperty.PropertyType)};";
         }
 
         private static string GenerateContent(TsClassProperty classProperty)
         {
-            if (classProperty.PropertyType is TsDefaultType defaultType)
-            {
-                return $"{Convert(classProperty.AccessModifier)}{classProperty.Name}: {Convert(defaultType)};";
-            }
-
-            return $"{Convert(classProperty.AccessModifier)}{classProperty.Name}: {classProperty.PropertyType.Name};";
+            return $"{Convert(classProperty.AccessModifier)}{classProperty.Name}: {GetContent(classProperty.PropertyType)};";
         }
 
         private static string Convert(TsAccessModifier accessModifier)
@@ -148,23 +166,6 @@ namespace TypeSharp
                     throw new ArgumentOutOfRangeException(nameof(accessModifier), accessModifier, null);
             }
         }
-
-        private static string Convert(TsDefaultType tsDefaultType)
-        {
-            switch (tsDefaultType)
-            {
-                case TsBoolean tsBoolean:
-                    return tsBoolean.IsObject ? "Boolean" : "boolean";
-                case TsDate _:
-                    return "Date";
-                case TsNumber tsNumber:
-                    return tsNumber.IsObject ? "Number" : "number";
-                case TsString tsString:
-                    return tsString.IsObject ? "String" : "string";
-                default:
-                    throw new ArgumentException("Could not create content for default type");
-            }
-        }   
     }
 
     public class TsFile

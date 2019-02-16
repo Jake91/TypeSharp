@@ -58,6 +58,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="TestData\NamespaceClasses\FirstSpace\ClassWithPropertyReferenceToAnotherNamespace.cs" />
+    <Compile Include="TestData\SimpleClasses\ArrayClasses.cs" />
+    <Compile Include="TestData\SimpleClasses\GenericClasses.cs" />
     <Compile Include="TestData\SimpleClasses\ClassWithAllSupportedTypes.cs" />
     <Compile Include="TestData\SimpleClasses\SimpleEnum.cs" />
     <Compile Include="TestData\SimpleClasses\TestClassBase.cs" />
