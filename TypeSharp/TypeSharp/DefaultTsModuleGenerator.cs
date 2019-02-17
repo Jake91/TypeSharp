@@ -58,16 +58,16 @@ namespace TypeSharp
             return GetReferences(tsType.CSharpType.Namespace, tsType.Properties.Select(x => x.PropertyType), tsType.BaseType, modulesForNamespace);
         }
 
-        private static IList<TsModuleReference> GetReferences(string @namespace, IEnumerable<TsReferenceBase> propertyTypes,
-            TsTypeReferenceBase baseType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
+        private static IList<TsModuleReference> GetReferences(string @namespace, IEnumerable<TsTypeBase> propertyTypes,
+            TsTypeBase baseType, IReadOnlyDictionary<string, TsModule> modulesForNamespace)
         {
             var referenceDict = new Dictionary<TsModule, List<TsTypeBase>>();
             var ownModule = modulesForNamespace[@namespace];
 
-            var references = propertyTypes.SelectMany(GetTsTypes).Where(x => !(x is TsDefaultType)).ToList();
+            var references = propertyTypes.SelectMany(GetReferences).Where(x => !(x is TsDefaultType) && !(x is TsArray)).ToList();
             if (baseType != null)
             {
-                references.AddRange(GetTsTypes(baseType).Where(x => !(x is TsDefaultType)));
+                references.AddRange(GetReferences(baseType).Where(x => !(x is TsDefaultType) && !(x is TsArray)));
             }
             foreach (var propertyType in references)
             {
@@ -95,18 +95,15 @@ namespace TypeSharp
             return referenceDict.Select(kvp => new TsModuleReference(kvp.Key, kvp.Value)).ToList();
         }
 
-        private static IList<TsTypeBase> GetTsTypes(TsReferenceBase referenceBase)
+        private static IList<TsTypeBase> GetReferences(TsTypeBase referenceBase)
         {
             switch (referenceBase)
             {
-                case TsGenericTypeReferenceArgument _:
-                    return new List<TsTypeBase>();
                 case TsGenericTypeReference tsGenericTypeReference:
-                    return tsGenericTypeReference.GenericArguments.SelectMany(GetTsTypes).ToList();
-                case TsTypeReference tsTypeReference:
-                    return new List<TsTypeBase> { tsTypeReference.Type };
+                    return tsGenericTypeReference.GenericArguments.Concat(new List<TsTypeBase>() { tsGenericTypeReference.Type })
+                        .SelectMany(GetReferences).ToList();
                 default:
-                    throw new ArgumentException("Not a valid type");
+                    return new List<TsTypeBase>() { referenceBase };
             }
         }
     }

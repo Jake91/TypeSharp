@@ -19,7 +19,12 @@ namespace TypeSharp.Tests
             var result = modules.Select(x => tsFileContentGenerator.Generate("TestRoot", x)).ToList();
             Assert.AreEqual(actual: result[1].Content, expected: "import { ClassWithAllSupportedTypes } from \"TestRoot/TypeSharp/Tests/TestData/SimpleClasses\";\r\nexport interface ClassWithPropertyReferenceToAnotherNamespace {\r\n\tClassWithAllSupportedTypes: ClassWithAllSupportedTypes;\r\n}\r\n");
         }
-
+        
+        [TestCase(typeof(ArrayClass), "export interface ArrayClass {\r\n\tStringArray: string[];\r\n\tStringList: string[];\r\n\tStringIList: string[];\r\n\tStringCollection: string[];\r\n\tStringEnumerable: string[];\r\n\tStringHashSet: string[];\r\n\tStringSet: string[];\r\n}\r\n")]
+        [TestCase(typeof(GenericClassWithGenericArrayProperties<>), "export interface GenericClassWithGenericArrayProperties<T> {\r\n\tGenericArray: T[];\r\n\tGenericList: T[];\r\n\tGenericIList: T[];\r\n}\r\n")]
+        [TestCase(typeof(ClassWithGenericBaseTypeList<>), "export interface ClassWithGenericBaseTypeList<T> extends GenericClass<T[]> {\r\n}\r\nexport interface GenericClass<T> {\r\n\tProp: T;\r\n}\r\n")]
+        [TestCase(typeof(ClassWithGenericParameterPassedToBaseTypeAsArray<>), "export interface ClassWithGenericParameterPassedToBaseTypeAsArray<T> extends GenericClass<T[]> {\r\n}\r\nexport interface GenericClass<T> {\r\n\tProp: T;\r\n}\r\n")]
+        [TestCase(typeof(ClassWithOwnGenericListProperty), "export interface ClassWithOwnGenericListProperty {\r\n\tList: string[];\r\n}\r\n")]
         [TestCase(typeof(ClassWithAllSupportedTypes), "export interface ClassWithAllSupportedTypes {\r\n\tAbool: boolean;\r\n\tAstring: string;\r\n\tADatetime: Date;\r\n\tADatetimeOffset: Date;\r\n\tAlong: number;\r\n\tAint: number;\r\n\tAdecimal: number;\r\n\tAdouble: number;\r\n}\r\n")]
         [TestCase(typeof(TestClassChild), "export interface TestClassChild extends TestClassBase {\r\n\tTestNameChild: string;\r\n}\r\nexport interface TestClassBase {\r\n\tNameInBase: string;\r\n}\r\n")]
         [TestCase(typeof(SimpleEnum), "export enum SimpleEnum {\r\n\tOne = 3,\r\n\tTwo = 5\r\n}\r\n")]
@@ -35,6 +40,5 @@ namespace TypeSharp.Tests
             var result = tsFileContentGenerator.Generate("TestRoot", module);
             Assert.AreEqual(actual: result.Content, expected: expected);
         }
-        
     }
 }

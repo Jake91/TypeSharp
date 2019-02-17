@@ -38,4 +38,14 @@ namespace TypeSharp.Tests.TestData.SimpleClasses
     {
 
     }
+
+    public class MyList<T> : List<T>
+    {
+
+    }
+
+    public class ClassWithOwnGenericListProperty
+    {
+        public MyList<string> List { get; set; }
+    }
 }

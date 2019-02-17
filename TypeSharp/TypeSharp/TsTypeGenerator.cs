@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Castle.Core.Internal;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Security.Cryptography.X509Certificates;
-using Castle.Core.Internal;
 
 namespace TypeSharp
 {
@@ -40,12 +40,12 @@ namespace TypeSharp
 
         private static IList<Type> GetDependingTypes(Type type)
         {
-            var set = new HashSet<Type>();
+            var set = new HashSet<Type>(); 
             var stack = new Stack<Type>();
             AddBaseTypeIfItExist(stack, type);
             AddPropertyTypesIfItExist(stack, type);
             AddGenericArgumentsIfExist(stack, type);
-            while (!stack.IsNullOrEmpty())
+            while (!stack.IsNullOrEmpty()) // Use while loop instead of recursion for performance reasons
             {
                 var current = stack.Pop();
                 if (set.Contains(current)) // todo performance
@@ -65,24 +65,35 @@ namespace TypeSharp
         {
             if (HasBaseType(type.BaseType))
             {
-                AddTypeAndAssureTypeDefinitionForGenerics(stack, type.BaseType);
+                TryAddType(stack, type.BaseType);
             }
         }
 
         private static void AddPropertyTypesIfItExist(Stack<Type> stack, Type type)
         {
-            foreach (var property in GetProperties(type).Where(x => !x.PropertyType.IsGenericParameter)/*Remove T1, T2...*/)
+            foreach (var property in GetProperties(type))
             {
-                if (!IsDefaultType(property.PropertyType))
-                {
-                    AddTypeAndAssureTypeDefinitionForGenerics(stack, property.PropertyType);
-                }
+                TryAddType(stack, property.PropertyType);
             }
         }
 
-        private static void AddTypeAndAssureTypeDefinitionForGenerics(Stack<Type> stack, Type type)
+        private static void TryAddType(Stack<Type> stack, Type type)
         {
-            if (type.IsGenericType)
+            if (IsDefaultType(type)) /*Remove string, int etc*/
+            {
+                return;
+            }
+
+            if (type.IsGenericParameter) /*Remove T1, T2...*/
+            {
+                return;
+            }
+            
+            if(IsCollection(type))
+            {
+                TryAddType(stack, GetCollectionType(type));
+            }
+            else if (type.IsGenericType)
             {
                 stack.Push(type.IsGenericTypeDefinition ? type : type.GetGenericTypeDefinition());
             }
@@ -96,9 +107,9 @@ namespace TypeSharp
         {
             if (type.IsGenericType)
             {
-                foreach (var genericType in type.GetGenericArguments().Where(x => !x.IsGenericParameter)/*Remove T1, T2...*/)
+                foreach (var genericType in type.GetGenericArguments())
                 {
-                    AddTypeAndAssureTypeDefinitionForGenerics(stack, genericType);
+                    TryAddType(stack, genericType);
                 }
             }
         }
@@ -114,7 +125,7 @@ namespace TypeSharp
                 if (type.IsGenericType) // todo
                 {
                     AssureTypeDefinition(type);
-                    return new TsClass(type, GetGenericTypeName(type), true, new List<TsClassProperty>(), null, type.GetGenericArguments().Select(x => new TsGenericArgument(x.Name)).ToList());
+                    return new TsClass(type, GetGenericTypeName(type), true, new List<TsClassProperty>(), null, type.GetGenericArguments().Select(x => new TsGenericArgument(x, x.Name)).ToList());
                 }
                 return new TsClass(type, type.Name, true, new List<TsClassProperty>(), null, new List<TsGenericArgument>());
             }
@@ -123,7 +134,7 @@ namespace TypeSharp
                 if (type.IsGenericType) // todo
                 {
                     AssureTypeDefinition(type);
-                    return new TsInterface(type, GetGenericTypeName(type), true, new List<TsInterfaceProperty>(), null, type.GetGenericArguments().Select(x => new TsGenericArgument(x.Name)).ToList());
+                    return new TsInterface(type, GetGenericTypeName(type), true, new List<TsInterfaceProperty>(), null, type.GetGenericArguments().Select(x => new TsGenericArgument(x, x.Name)).ToList());
                 }
                 return new TsInterface(type, type.Name, true, new List<TsInterfaceProperty>(), null, new List<TsGenericArgument>());
             }
@@ -147,27 +158,32 @@ namespace TypeSharp
             }
         }
 
-        private static TsReferenceBase GetTsReference(Type genericType, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        private static TsTypeBase GetTsType(Type type, IReadOnlyDictionary<Type, TsTypeBase> typeDict) // todo naming?
         {
-            if (genericType.IsGenericParameter)
+            if (type.IsGenericParameter)
             {
-                return GetTsGenericTypeReferenceArgument(genericType, typeDict);
-            }
-
-            if (!genericType.IsGenericType)
-            {
-                return IsDefaultType(genericType) ? 
-                    new TsTypeReference(GetDefaultType(genericType)) : 
-                    new TsTypeReference(typeDict[genericType]);
+                return GetTsGenericTypeReferenceArgument(type, typeDict);
             }
             
-            if (genericType.IsGenericType && genericType.IsGenericTypeDefinition)
+            if (IsCollection(type))
+            {
+                return new TsArray(type, GetTsType(GetCollectionType(type), typeDict));
+            }
+
+            if (!type.IsGenericType)
+            {
+                return IsDefaultType(type) ?
+                    GetDefaultType(type) :
+                    typeDict[type];
+            }
+            
+            if (type.IsGenericType && type.IsGenericTypeDefinition)
             {
                 throw new ArgumentException("TypContainer can not contain GenericTypeDefinition");
             }
             
-            var list = new List<TsReferenceBase>();
-            foreach (var genericArgument in genericType.GetGenericArguments())
+            var list = new List<TsTypeBase>();
+            foreach (var genericArgument in type.GetGenericArguments())
             {
                 if (genericArgument.IsGenericParameter)
                 {
@@ -175,13 +191,13 @@ namespace TypeSharp
                 }
                 else
                 {
-                    list.Add(GetTsReference(genericArgument, typeDict));
+                    list.Add(GetTsType(genericArgument, typeDict));
                 }
             }
-            return new TsGenericTypeReference(typeDict[genericType.GetGenericTypeDefinition()], list);
+            return new TsGenericTypeReference(type, typeDict[type.GetGenericTypeDefinition()], list);
         }
 
-        private static TsGenericTypeReferenceArgument GetTsGenericTypeReferenceArgument(Type genericParameter, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        private static TsGenericArgument GetTsGenericTypeReferenceArgument(Type genericParameter, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
         {
             if (!genericParameter.IsGenericParameter)
             {
@@ -199,11 +215,9 @@ namespace TypeSharp
             switch (tsDaddy)
             {
                 case TsClass tsClass:
-                    return new TsGenericTypeReferenceArgument(
-                        tsClass.GenericArguments.Single(x => x.Name == genericParameter.Name));
+                    return tsClass.GenericArguments.Single(x => x.Name == genericParameter.Name);
                 case TsInterface tsInterface:
-                    return new TsGenericTypeReferenceArgument(
-                        tsInterface.GenericArguments.Single(x => x.Name == genericParameter.Name));
+                    return tsInterface.GenericArguments.Single(x => x.Name == genericParameter.Name);
                 default:
                     throw new ArgumentException($"Invalid type ({tsDaddy.Name})");
             }
@@ -236,14 +250,14 @@ namespace TypeSharp
 
         private static bool HasBaseType(Type baseType)
         {
-            return baseType != null && baseType != typeof(object) && baseType != typeof(Enum);
+            return baseType != null && baseType != typeof(object) && baseType != typeof(Enum) && !IsCollection(baseType);
         }
 
-        private static void PopulateBaseType(Type baseType, Action<TsTypeReferenceBase> setBaseTypeFn, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
+        private static void PopulateBaseType(Type baseType, Action<TsTypeBase> setBaseTypeFn, IReadOnlyDictionary<Type, TsTypeBase> typeDict)
         {
             if (HasBaseType(baseType))
             {
-                setBaseTypeFn(GetTsReference(baseType, typeDict) as TsTypeReferenceBase);
+                setBaseTypeFn(GetTsType(baseType, typeDict));
             }
         }
 
@@ -253,7 +267,7 @@ namespace TypeSharp
 
             foreach (var propertyInfo in properties)
             {
-                var typeContainer = GetTsReference(propertyInfo.PropertyType, typeDict);
+                var typeContainer = GetTsType(propertyInfo.PropertyType, typeDict);
                 type.Properties.Add(new TsClassProperty(propertyInfo.Name, typeContainer, TsAccessModifier.Public, false, false));
             }
         }
@@ -267,7 +281,7 @@ namespace TypeSharp
                 type.Properties.Add(
                     new TsInterfaceProperty(
                         propertyInfo.Name,
-                        GetTsReference(propertyInfo.PropertyType, typeDict)));
+                        GetTsType(propertyInfo.PropertyType, typeDict)));
             }
         }
 
@@ -308,6 +322,29 @@ namespace TypeSharp
                 type == typeof(decimal) ||
                 type == typeof(double);
         }
+
+        private static bool IsCollection(Type type)
+        {
+            return type.IsArray ||
+                   (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)) ||
+                   (type.IsGenericType && type.GetGenericTypeDefinition().GetInterfaces()
+                                        .Select(x => x.IsGenericType ? x.GetGenericTypeDefinition() : x).Contains(typeof(IEnumerable<>)));
+        }
+
+        private static Type GetCollectionType(Type type)
+        {
+            if (!IsCollection(type))
+            {
+                throw new ArgumentException("Type is not a collection");
+            }
+
+            if (type.IsArray)
+            {
+                return type.GetElementType();
+            }
+
+            return type.GetGenericArguments().Single();
+        }
     }
 
     public abstract class TsTypeBase
@@ -323,7 +360,7 @@ namespace TypeSharp
 
     public sealed class TsClass : TsTypeBase
     {
-        public TsTypeReferenceBase BaseType { get; internal set; }
+        public TsTypeBase BaseType { get; internal set; }
 
         public bool IsExport { get; set; }
 
@@ -333,7 +370,7 @@ namespace TypeSharp
         public ICollection<TsClassProperty> Properties { get; }
 
         public TsClass(Type cSharpType, string name, bool isExport, ICollection<TsClassProperty> properties,
-            TsTypeReferenceBase baseType, ICollection<TsGenericArgument> genericArguments) : base(cSharpType)
+            TsTypeBase baseType, ICollection<TsGenericArgument> genericArguments) : base(cSharpType)
         {
             IsExport = isExport;
             Properties = properties;
@@ -345,60 +382,17 @@ namespace TypeSharp
         public override string Name { get; }
     }
 
-    public class TsGenericTypeReference : TsTypeReferenceBase // <ClassX<T1>>
+    public class TsGenericTypeReference : TsTypeBase // ex <ClassX<T1>>
     {
         public override string Name => Type.Name;
-        public override TsTypeBase Type { get; }
-        public ICollection<TsReferenceBase> GenericArguments { get; }
+        public TsTypeBase Type { get; }
+        public ICollection<TsTypeBase> GenericArguments { get; }
 
-        public TsGenericTypeReference(TsTypeBase type, ICollection<TsReferenceBase> genericArguments)
+        public TsGenericTypeReference(Type cSharpType, TsTypeBase type, ICollection<TsTypeBase> genericArguments) : base(cSharpType)
         {
             Type = type;
             GenericArguments = genericArguments;
         }
-    }
-
-    public class TsGenericTypeReferenceArgument : TsReferenceBase // <T1>...
-    {
-        public override string Name => GenericArgument.Name;
-
-        public TsGenericArgument GenericArgument { get; }
-
-        public TsGenericTypeReferenceArgument(TsGenericArgument genericArgument)
-        {
-            GenericArgument = genericArgument;
-        }
-    }
-
-    public abstract class TsReferenceBase
-    {
-        public abstract string Name { get; }
-    }
-
-    public abstract class TsTypeReferenceBase : TsReferenceBase
-    {
-        public abstract TsTypeBase Type { get; }
-    }
-
-    public sealed class TsTypeReference : TsTypeReferenceBase // ClassX
-    {
-        public override string Name => Type.Name;
-        public override TsTypeBase Type { get; }
-
-        public TsTypeReference(TsTypeBase type)
-        {
-            Type = type;
-        }
-
-        //public static implicit operator TsTypeBase(TypeContainer baseTypeContainer)
-        //{
-        //    return baseTypeContainer.Type;
-        //}
-
-        //public static explicit operator TypeContainer(TsTypeBase tsTypeBase)
-        //{
-        //    return new TypeContainer(tsTypeBase, new List<TsTypeBase>());
-        //}
     }
 
     public sealed class TsInterface : TsTypeBase
@@ -410,10 +404,10 @@ namespace TypeSharp
         public bool IsGeneric => !GenericArguments.IsNullOrEmpty();
         public ICollection<TsGenericArgument> GenericArguments { get; }
 
-        public TsTypeReferenceBase BaseType { get; internal set; }
+        public TsTypeBase BaseType { get; internal set; }
 
         public TsInterface(Type cSharpType, string name, bool isExport, ICollection<TsInterfaceProperty> properties,
-            TsTypeReferenceBase baseType, ICollection<TsGenericArgument> genericArguments)
+            TsTypeBase baseType, ICollection<TsGenericArgument> genericArguments)
             : base(cSharpType)
         {
             IsExport = isExport;
@@ -426,11 +420,11 @@ namespace TypeSharp
         public override string Name { get; }
     }
 
-    public class TsGenericArgument
+    public class TsGenericArgument : TsTypeBase // ex. T1
     {
-        public string Name { get; }
+        public override string Name { get; }
 
-        public TsGenericArgument(string name)
+        public TsGenericArgument(Type cSharType,string name) : base(cSharType)
         {
             Name = name;
         }
@@ -465,7 +459,7 @@ namespace TypeSharp
 
     public abstract class TsDefaultType : TsTypeBase
     {
-        public abstract bool IsObject { get; protected set; }
+        public abstract bool IsObject { get; protected set; } // todo remove?
 
         protected TsDefaultType(Type cSharpType) : base(cSharpType)
         {
@@ -535,15 +529,27 @@ namespace TypeSharp
         public override string Name => "Date";
     }
 
+    public sealed class TsArray : TsTypeBase
+    {
+        public TsTypeBase ElementType { get; }
+
+        public TsArray(Type cSharpType, TsTypeBase elementType) : base(cSharpType)
+        {
+            ElementType = elementType;
+        }
+
+        public override string Name => ElementType.Name + "[]";
+    }
+
     public class TsClassProperty
     {
         public string Name { get; set; }
-        public TsReferenceBase PropertyType { get; }
+        public TsTypeBase PropertyType { get; }
         public TsAccessModifier AccessModifier { get; set; }
         public bool HasGetter { get; set; } // todo
         public bool HasSetter { get; set; } // todo
 
-        public TsClassProperty(string name, TsReferenceBase propertyType, TsAccessModifier accessModifier, bool hasGetter, bool hasSetter)
+        public TsClassProperty(string name, TsTypeBase propertyType, TsAccessModifier accessModifier, bool hasGetter, bool hasSetter)
         {
             Name = name;
             PropertyType = propertyType;
@@ -556,9 +562,9 @@ namespace TypeSharp
     public class TsInterfaceProperty
     {
         public string Name { get; }
-        public TsReferenceBase PropertyType { get; }
+        public TsTypeBase PropertyType { get; }
 
-        public TsInterfaceProperty(string name, TsReferenceBase propertyType)
+        public TsInterfaceProperty(string name, TsTypeBase propertyType)
         {
             Name = name;
             PropertyType = propertyType;

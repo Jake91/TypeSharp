@@ -62,7 +62,7 @@ namespace TypeSharp
 
             if (type.BaseType != null)
             {
-                builder.Append($" extends {GetContent(type.BaseType)}"); // todo
+                builder.Append($" extends {GetGenericContent(type.BaseType)}"); // todo
             }
             builder.Append(" {");
             builder.AppendLine();
@@ -75,19 +75,17 @@ namespace TypeSharp
             builder.Append(indententionString + "}");
         }
 
-        private static string GetContent(TsReferenceBase reference)
+        private static string GetGenericContent(TsTypeBase reference)
         {
             switch (reference)
             {
-                case TsGenericTypeReferenceArgument tsGenericTypeReferenceArgument:// TResult
-                    return tsGenericTypeReferenceArgument.Name; 
+                case TsGenericArgument genericArgument:// TResult
+                    return genericArgument.Name; 
                 case TsGenericTypeReference tsGenericTypeReference: // ClassX<int, ClassY<string>>
                     return tsGenericTypeReference.Type.Name + "<" + string.Join(", ",
-                               tsGenericTypeReference.GenericArguments.Select(GetContent)) + ">"; 
-                case TsTypeReference tsTypeReference:
-                    return tsTypeReference.Type.Name;
+                               tsGenericTypeReference.GenericArguments.Select(GetGenericContent)) + ">"; 
                 default:
-                    throw new ArgumentException("Not okay");
+                    return reference.Name;
             }
         }
 
@@ -108,7 +106,7 @@ namespace TypeSharp
 
             if (type.BaseType != null)
             {
-                builder.Append($" extends {GetContent(type.BaseType)}");
+                builder.Append($" extends {GetGenericContent(type.BaseType)}");
             }
             builder.Append(" {");
             builder.AppendLine();
@@ -142,12 +140,12 @@ namespace TypeSharp
 
         private static string GenerateContent(TsInterfaceProperty interfaceProperty)
         {
-            return $"{interfaceProperty.Name}: {GetContent(interfaceProperty.PropertyType)};";
+            return $"{interfaceProperty.Name}: {GetGenericContent(interfaceProperty.PropertyType)};";
         }
 
         private static string GenerateContent(TsClassProperty classProperty)
         {
-            return $"{Convert(classProperty.AccessModifier)}{classProperty.Name}: {GetContent(classProperty.PropertyType)};";
+            return $"{Convert(classProperty.AccessModifier)}{classProperty.Name}: {GetGenericContent(classProperty.PropertyType)};";
         }
 
         private static string Convert(TsAccessModifier accessModifier)
