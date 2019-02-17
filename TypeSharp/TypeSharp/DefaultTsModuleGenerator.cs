@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using TypeSharp.TsModel.Modules;
+using TypeSharp.TsModel.Types;
 
 namespace TypeSharp
 {
@@ -105,42 +107,6 @@ namespace TypeSharp
                 default:
                     return new List<TsTypeBase>() { referenceBase };
             }
-        }
-    }
-
-    public sealed class TsModuleReference
-    {
-        public TsModule Module { get; }
-        public IList<TsTypeBase> Types { get; }
-
-        public TsModuleReference(TsModule module, IList<TsTypeBase> types)
-        {
-            Module = module;
-            Types = types;
-        }
-    }
-
-    public sealed class TsModule
-    {
-        public readonly string ModuleName; // SimpleClasses
-        public readonly IReadOnlyCollection<string> ModulePath; // { "TypeSharp","Tests", "TestData" }
-        public ICollection<TsModuleReference> References { get; set; }
-        public ICollection<TsTypeBase> Types { get; set; }
-
-
-        public TsModule(string moduleName, IReadOnlyCollection<string> modulePath, ICollection<TsModuleReference> references, ICollection<TsTypeBase> types)
-        {
-            ModuleName = moduleName;
-            ModulePath = modulePath;
-            References = references;
-            Types = types;
-        }
-
-        public bool GeneratesJavascript => Types.Any(x => !(x is TsInterface));
-
-        public string GetModuleImport(string rootElement) // todo naming?
-        {
-            return $@"{rootElement}/{string.Join("/", ModulePath)}/{ModuleName}";
         }
     }
 }

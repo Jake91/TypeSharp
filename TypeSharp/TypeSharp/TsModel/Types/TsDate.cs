@@ -1,0 +1,16 @@
+﻿using System;
+
+namespace TypeSharp.TsModel.Types
+{
+    public sealed class TsDate : TsDefaultType
+    {
+        public override bool IsObject { get; protected set; }
+
+        public TsDate(Type cSharpType) : base(cSharpType)
+        {
+            IsObject = true;
+        }
+
+        public override string Name => "Date";
+    }
+}

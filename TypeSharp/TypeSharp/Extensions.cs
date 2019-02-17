@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace TypeSharp
 {
@@ -10,7 +8,6 @@ namespace TypeSharp
         {
             if (source is List<T> listSource)
             {
-                // do native AddRange if possible (better performance)
                 listSource.AddRange(items);
                 return;
             }
