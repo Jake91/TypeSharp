@@ -1,11 +1,11 @@
 ﻿namespace TypeSharp.TsModel.Types
 {
-    public sealed class EnumValue
+    public sealed class TsEnumValue
     {
         public string Name { get; }
         public int Value { get; }
 
-        public EnumValue(string name, int value)
+        public TsEnumValue(string name, int value)
         {
             Name = name;
             Value = value;

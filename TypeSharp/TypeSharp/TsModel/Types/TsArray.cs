@@ -2,13 +2,10 @@
 
 namespace TypeSharp.TsModel.Types
 {
-    public sealed class TsArray : TsTypeBase
+    public sealed class TsArray : TsCollection
     {
-        public TsTypeBase ElementType { get; }
-
-        public TsArray(Type cSharpType, TsTypeBase elementType) : base(cSharpType)
+        public TsArray(Type cSharpType, TsTypeBase elementType) : base(cSharpType, elementType)
         {
-            ElementType = elementType;
         }
 
         public override string Name => ElementType.Name + "[]";

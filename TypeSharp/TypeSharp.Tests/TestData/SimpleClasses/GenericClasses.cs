@@ -20,6 +20,7 @@
     {
 
     }
+
     public class GenericClassThatPassesGenericParamToGenericBaseClass<T> : BasicGeneric<BasicGeneric<T, int>, string>
     {
 

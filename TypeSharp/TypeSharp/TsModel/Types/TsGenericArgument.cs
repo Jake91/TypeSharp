@@ -2,7 +2,11 @@
 
 namespace TypeSharp.TsModel.Types
 {
-    public class TsGenericArgument : TsTypeBase // ex. T1
+    /// <inheritdoc />
+    /// <summary>
+    /// Represents a generic argument. Ex. TResult
+    /// </summary>
+    public class TsGenericArgument : TsTypeBase
     {
         public override string Name { get; }
 

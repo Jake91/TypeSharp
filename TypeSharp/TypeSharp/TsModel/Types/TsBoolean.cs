@@ -2,7 +2,7 @@
 
 namespace TypeSharp.TsModel.Types
 {
-    public sealed class TsBoolean : TsDefaultType
+    public sealed class TsBoolean : TsDefaultTypeBase
     {
         public override bool IsObject { get; protected set; }
 

@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace TypeSharp.Tests.TestData.SimpleClasses
 {
@@ -17,7 +13,7 @@ namespace TypeSharp.Tests.TestData.SimpleClasses
         public decimal Adecimal { get; set; }
         public double Adouble { get; set; }
 
-        //public byte Abyte { get; set; }
+        //public byte Abyte { get; set; } todo
         //public sbyte Asbyte { get; set; }
         //public char Achar { get; set; }
         //public float Afloat { get; set; }

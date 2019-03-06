@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 
-namespace TypeSharp
+namespace TypeSharp.Common
 {
     public static class CollectionExtensions
     {
@@ -15,6 +16,15 @@ namespace TypeSharp
             {
                 source.Add(item);
             }
+        }
+        
+        public static bool IsNullOrEmpty(this IEnumerable source)
+        {
+            if (source != null)
+            {
+                return !source.GetEnumerator().MoveNext();
+            }
+            return true;
         }
     }
 }

@@ -6,17 +6,17 @@ namespace TypeSharp.TsModel.Modules
 {
     public sealed class TsModule
     {
-        public readonly string ModuleName; // SimpleClasses
-        public readonly IReadOnlyCollection<string> ModulePath; // { "TypeSharp","Tests", "TestData" }
-        public ICollection<TsModuleReference> References { get; set; }
-        public ICollection<TsTypeBase> Types { get; set; }
+        public TsModuleLocation Location { get; }
+
+        public ICollection<TsModuleImport> Imports { get; set; }
+
+        public ICollection<TsTypeDefinitionBase> Types { get; set; }
 
 
-        public TsModule(string moduleName, IReadOnlyCollection<string> modulePath, ICollection<TsModuleReference> references, ICollection<TsTypeBase> types)
+        public TsModule(TsModuleLocation location, ICollection<TsModuleImport> imports, ICollection<TsTypeDefinitionBase> types)
         {
-            ModuleName = moduleName;
-            ModulePath = modulePath;
-            References = references;
+            Location = location;
+            Imports = imports;
             Types = types;
         }
 
@@ -24,7 +24,7 @@ namespace TypeSharp.TsModel.Modules
 
         public string GetModuleImport(string rootElement) // todo naming?
         {
-            return $@"{rootElement}/{string.Join("/", ModulePath)}/{ModuleName}";
+            return $@"{rootElement}/{string.Join("/", Location.Path)}/{Location.Name}";
         }
     }
 }

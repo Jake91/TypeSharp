@@ -7,27 +7,25 @@ namespace TypeSharp.TsModel.Files
     public class TsFile
     {
         public string Content { get; }
-
-        private readonly string fileName;
-
-        private readonly IReadOnlyCollection<string> filePaths;
-        private readonly TsFileType fileType;
+        public string FileName { get; }
+        public IReadOnlyCollection<string> FilePath { get; }
+        public TsFileType FileType { get; }
 
 
-        public TsFile(string content, string fileName, IReadOnlyCollection<string> filePaths, TsFileType fileType)
+        public TsFile(string content, string fileName, IReadOnlyCollection<string> filePath, TsFileType fileType)
         {
             Content = content;
-            this.fileName = fileName;
-            this.filePaths = filePaths;
-            this.fileType = fileType;
+            FileName = fileName;
+            FilePath = filePath;
+            FileType = fileType;
         }
 
-        public string GetFilePath(string outPutFolder) // todo naming?
+        public string GetFullFilePath(string outPutFolder)
         {
-            return Path.Combine(outPutFolder, $@"{string.Join(Path.DirectorySeparatorChar.ToString(), filePaths)}{Path.DirectorySeparatorChar}{fileName}.{FileType(fileType)}");
+            return Path.Combine(outPutFolder, $@"{string.Join(Path.DirectorySeparatorChar.ToString(), FilePath)}{Path.DirectorySeparatorChar}{FileName}.{FileTypeString(FileType)}");
         }
 
-        private static string FileType(TsFileType tsFileType)
+        private static string FileTypeString(TsFileType tsFileType)
         {
             switch (tsFileType)
             {

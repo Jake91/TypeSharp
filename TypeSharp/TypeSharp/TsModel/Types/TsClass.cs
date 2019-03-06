@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using Castle.Core.Internal;
+using TypeSharp.Common;
 
 namespace TypeSharp.TsModel.Types
 {
-    public sealed class TsClass : TsTypeBase
+    public sealed class TsClass : TsTypeDefinitionBase
     {
-        public TsTypeBase BaseType { get; internal set; }
+        public TsTypeBase BaseType { get; internal set; } // Can be null
 
         public bool IsExport { get; set; }
 

@@ -4,17 +4,18 @@ using System.Collections.Generic;
 using System.Linq;
 using TypeSharp.Tests.TestData.NamespaceClasses.FirstSpace;
 using TypeSharp.Tests.TestData.SimpleClasses;
+using TypeSharp.TsGenerators;
 
 namespace TypeSharp.Tests
 {
     [TestFixture]
-    public class UnitTest1
+    public class TsGeneratorsOutputTest
     {
         [Test]
         public void TestModuleReference()
         {
             var tsTypes = new TsTypeGenerator().Generate(new List<Type>() { typeof(ClassWithAllSupportedTypes), typeof(ClassWithPropertyReferenceToAnotherNamespace) }, generateInterfaceAsDefault: true);
-            var modules = new DefaultTsModuleGenerator().Generate(tsTypes);
+            var modules = new TsModuleGenerator().Generate(tsTypes);
             var tsFileContentGenerator = new TsFileContentGenerator();
             var result = modules.Select(x => tsFileContentGenerator.Generate("TestRoot", x)).ToList();
             Assert.AreEqual(actual: result[1].Content, expected: "import { ClassWithAllSupportedTypes } from \"TestRoot/TypeSharp/Tests/TestData/SimpleClasses\";\r\nexport interface ClassWithPropertyReferenceToAnotherNamespace {\r\n\tClassWithAllSupportedTypes: ClassWithAllSupportedTypes;\r\n}\r\n");
@@ -35,7 +36,7 @@ namespace TypeSharp.Tests
         public void TestTypeToStringContentGenerateForSingleModule(Type type, string expected)
         {
             var tsTypes = new TsTypeGenerator().Generate(type, generateInterfaceAsDefault: true);
-            var module = new DefaultTsModuleGenerator().Generate(tsTypes).Single();
+            var module = new TsModuleGenerator().Generate(tsTypes).Single();
             var tsFileContentGenerator = new TsFileContentGenerator();
             var result = tsFileContentGenerator.Generate("TestRoot", module);
             Assert.AreEqual(actual: result.Content, expected: expected);

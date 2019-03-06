@@ -5,14 +5,14 @@ using TypeSharp.TsModel.Files;
 using TypeSharp.TsModel.Modules;
 using TypeSharp.TsModel.Types;
 
-namespace TypeSharp
+namespace TypeSharp.TsGenerators
 {
     public class TsFileContentGenerator
     {
         public TsFile Generate(string rootElement, TsModule module)
         {
             var builder = new StringBuilder();
-            foreach (var reference in module.References.OrderBy(x => x.Module.GetModuleImport(rootElement)))
+            foreach (var reference in module.Imports.OrderBy(x => x.Module.GetModuleImport(rootElement)))
             {
                 AddReferences(builder, rootElement, reference);
                 builder.AppendLine();
@@ -35,15 +35,15 @@ namespace TypeSharp
                 }
                 builder.AppendLine();
             }
-            return new TsFile(builder.ToString(), module.ModuleName, module.ModulePath, module.GeneratesJavascript ? TsFileType.TypeScript : TsFileType.Definition);
+            return new TsFile(builder.ToString(), module.Location.Name, module.Location.Path, module.GeneratesJavascript ? TsFileType.TypeScript : TsFileType.Definition);
         }
 
-        private static void AddReferences(StringBuilder builder, string rootElement, TsModuleReference reference)
+        private static void AddReferences(StringBuilder builder, string rootElement, TsModuleImport import)
         {
             builder.Append("import { ");
-            builder.Append(string.Join(", ", reference.Types.Select(x => x.Name).OrderBy(x => x)));
+            builder.Append(string.Join(", ", import.Types.Select(x => x.Name).OrderBy(x => x)));
             builder.Append(" } from \"");
-            builder.Append(reference.Module.GetModuleImport(rootElement) + "\";");
+            builder.Append(import.Module.GetModuleImport(rootElement) + "\";");
         }
 
         private static void AddContent(StringBuilder builder, string indententionString, TsClass type)
@@ -134,7 +134,7 @@ namespace TypeSharp
             builder.Append(indententionString + "}");
         }
 
-        private static string GenerateContent(EnumValue enumValue)
+        private static string GenerateContent(TsEnumValue enumValue)
         {
             return $"{enumValue.Name} = {enumValue.Value}";
         }

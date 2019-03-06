@@ -64,7 +64,8 @@
     <Compile Include="TestData\SimpleClasses\SimpleEnum.cs" />
     <Compile Include="TestData\SimpleClasses\TestClassBase.cs" />
     <Compile Include="TestData\SimpleClasses\TestClassChild.cs" />
-    <Compile Include="UnitTest1.cs" />
+    <Compile Include="TsModuleLocationTest.cs" />
+    <Compile Include="TsGeneratorsOutputTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

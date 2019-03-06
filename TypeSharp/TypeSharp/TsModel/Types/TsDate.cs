@@ -2,7 +2,7 @@
 
 namespace TypeSharp.TsModel.Types
 {
-    public sealed class TsDate : TsDefaultType
+    public sealed class TsDate : TsDefaultTypeBase
     {
         public override bool IsObject { get; protected set; }
 
