@@ -333,7 +333,7 @@ namespace TypeSharp.TsGenerators
                 }
                 return new TsInterface(type, type.Name, true, new List<TsInterfaceProperty>(), null, new List<TsGenericArgument>());
             }
-            throw new ArgumentException($"Type ({type.Name}) is not a interface, enum or class");
+            throw new ArgumentException($"Type ({type.Name}) is not a interface, enum or class"); // todo jl fix struct and nullable
         }
 
         private static string GetGenericTypeName(Type type)
