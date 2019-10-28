@@ -41,5 +41,21 @@ namespace TypeSharp.Tests
             var result = tsFileContentGenerator.Generate("TestRoot", module);
             Assert.AreEqual(actual: result.Content, expected: expected);
         }
+
+        //public void TestStuff()
+        //{
+        //      code for typescriptproxy generatpr Executor class
+        //    var typeProvider = new CombinedTypeProvider(TypeProvidersFactory.CreateAllTypeProviders(arguments));
+
+        //    var tsTypes = new TsTypeGenerator().Generate(typeProvider.FindTypes(), generateInterfaceAsDefault: true);
+        //    var modules = new TsModuleGenerator().Generate(tsTypes);
+        //    var tsFileContentGenerator = new TsFileContentGenerator();
+        //    foreach (var tsModule in modules)
+        //    {
+        //        var result = tsFileContentGenerator.Generate("JakeJS", tsModule);
+        //        var filePath = arguments.OutputDirectory + "/" + string.Join("/", result.FilePath);
+        //        WriteGeneratedFile(filePath, result.Content, false, false);
+        //    }
+        //}
     }
 }
